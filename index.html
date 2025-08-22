@@ -4,486 +4,245 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lease Statements</title>
-  <!--
-    This page is a standalone React application that implements the
-    functionality of the provided `lease_statements_front_end_canvas_react.jsx`
-    file without relying on a build step.  Instead of using a local Node
-    environment and bundler, we load React and ReactDOM directly from
-    unpkg CDN and compile our JSX on the fly using Babel.  TailwindCSS
-    is also loaded from a CDN to provide a clean, modern look.
-  -->
-  <!-- Tailwind for quick styling -->
+  <!-- Tailwind via CDN for quick prototyping. In a production build this should be bundled. -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- React and ReactDOM from CDN -->
+  <!-- React and ReactDOM via CDN for simplicity. For real projects use a bundler (Vite/CRA). -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <!-- Babel compiler for JSX in the browser -->
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-neutral-50 min-h-screen">
-  <div id="root"></div>
-  <!-- The application code lives here.  Babel will automatically
-       transpile the JSX into JavaScript in the browser. -->
-  <script type="text/babel">
-    const { useState, useMemo } = React;
+<body class="bg-gray-50">
+  <div id="root" class="container mx-auto p-4"></div>
+  <script type="text/javascript">
+    const { useState, useEffect } = React;
 
-    /* Utility for formatting numbers as ZAR currency */
-    const money = (n) => n.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR' });
+    // Utility for formatting numbers as ZAR
+    const money = (n) => {
+      if (isNaN(n)) return 'R0.00';
+      return n.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR' });
+    };
 
-    // Simple UI primitives.  These components approximate the ones from
-    // `@/components/ui` used in the original JSX file.  They wrap
-    // standard HTML elements with Tailwind classes to give them a
-    // consistent look and feel.
-    const Card = ({ children }) => (
-      <div className="rounded-xl border bg-white shadow-sm">
-        {children}
-      </div>
-    );
-    const CardContent = ({ children, className = '' }) => (
-      <div className={`p-4 ${className}`}>{children}</div>
-    );
-    const Label = ({ children }) => (
-      <label className="block text-sm font-medium text-gray-700">{children}</label>
-    );
-    const Input = ({ type = 'text', value, onChange, ...props }) => (
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        className="w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-        {...props}
-      />
-    );
-    const Textarea = ({ value, onChange, className = '', ...props }) => (
-      <textarea
-        value={value}
-        onChange={onChange}
-        className={`w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 ${className}`}
-        {...props}
-      />
-    );
-    const Button = ({ children, variant = 'primary', onClick, className = '', ...props }) => {
-      const base =
-        variant === 'secondary'
-          ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          : variant === 'outline'
-          ? 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-          : 'bg-indigo-600 text-white hover:bg-indigo-700';
-      return (
-        <button
-          onClick={onClick}
-          className={`inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium shadow-sm ${base} ${className}`}
-          {...props}
-        >
-          {children}
-        </button>
-      );
-    };
-    const Badge = ({ children, variant = 'secondary' }) => {
-      const style = variant === 'outline'
-        ? 'border border-gray-300 text-gray-700'
-        : variant === 'secondary'
-        ? 'bg-gray-100 text-gray-700'
-        : 'bg-indigo-100 text-indigo-700';
-      return (
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${style}`}>{children}</span>
-      );
-    };
-    // Simple toggle switch.  We implement it using a checkbox and some CSS.
-    const Switch = ({ checked, onCheckedChange }) => (
-      <label className="relative inline-flex cursor-pointer items-center">
-        <input
-          type="checkbox"
-          className="peer sr-only"
-          checked={checked}
-          onChange={(e) => onCheckedChange(e.target.checked)}
-        />
-        <div className="peer h-5 w-10 rounded-full bg-gray-300 after:absolute after:start-0 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-indigo-600 peer-checked:after:translate-x-5"></div>
-      </label>
-    );
-    // Tab components: Tabs, TabsList, TabsTrigger, TabsContent
-    const Tabs = ({ children, defaultValue }) => {
-      const [active, setActive] = useState(defaultValue);
-      // Clone children and inject props where needed
-      return React.Children.map(children, (child) => {
-        if (!React.isValidElement(child)) return child;
-        return React.cloneElement(child, { active, setActive });
-      });
-    };
-    const TabsList = ({ children, setActive, active, className = '' }) => (
-      <div className={`flex flex-wrap gap-2 ${className}`}>{
-        React.Children.map(children, (child) => React.cloneElement(child, { active, setActive }))
-      }</div>
-    );
-    const TabsTrigger = ({ value, children, active, setActive }) => {
-      const isActive = active === value;
-      return (
-        <button
-          className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium shadow-sm ${isActive ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
-          onClick={() => setActive(value)}
-        >
-          {children}
-        </button>
-      );
-    };
-    const TabsContent = ({ value, active, children, className = '' }) => {
-      return active === value ? <div className={className}>{children}</div> : null;
-    };
-    // Select component built on native <select>
-    const Select = ({ children, defaultValue, onChange }) => (
-      <select
-        defaultValue={defaultValue}
-        onChange={onChange}
-        className="w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-      >
-        {children}
-      </select>
-    );
-    const SelectContent = ({ children }) => children;
-    const SelectTrigger = ({ children }) => children;
-    const SelectItem = ({ value, children }) => <option value={value}>{children}</option>;
-    const SelectValue = () => null;
-
-    // Reusable number input field
+    // Helper component for labelled number inputs
     function Field({ label, value, onChange }) {
       return (
         <div className="space-y-1">
-          <Label>{label}</Label>
-          <Input
+          <label className="block text-sm font-medium text-gray-700">{label}</label>
+          <input
             type="number"
             value={value}
             onChange={(e) => onChange(parseFloat(e.target.value || '0'))}
+            className="w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           />
         </div>
       );
     }
 
+    // Main application component
     function App() {
-      // Month context
+      const tenantId = 'demoTenant'; // TODO: Replace with actual tenant ID once auth is added
+
+      // Current month string for display
       const [month, setMonth] = useState(new Date().toLocaleString('en-ZA', { month: 'long', year: 'numeric' }));
 
-      // Charges & payments
+      // Charge & payment fields
       const [rental, setRental] = useState(8200);
       const [water, setWater] = useState(0);
       const [electricity, setElectricity] = useState(0);
       const [otherDesc, setOtherDesc] = useState('');
       const [otherAmount, setOtherAmount] = useState(0);
       const [paymentAmount, setPaymentAmount] = useState(0);
+      const [paymentDate, setPaymentDate] = useState('');
+      const [paymentMethod, setPaymentMethod] = useState('EFT');
 
-      // Carry-over & adjustments
-      const [openingBalance, setOpeningBalance] = useState(0);
-      const [adjustment, setAdjustment] = useState(0);
+      // History state
+      const [history, setHistory] = useState([]);
+      const [loadingHistory, setLoadingHistory] = useState(false);
+      const [historyError, setHistoryError] = useState(null);
 
-      // Deposit
-      const [depositBalance, setDepositBalance] = useState(9261.10);
-      const [applyDepositInterest, setApplyDepositInterest] = useState(true);
-      const [interestRate, setInterestRate] = useState(6.0);
+      // On mount, fetch the tenant's history from the API
+      useEffect(() => {
+        async function loadHistory() {
+          setLoadingHistory(true);
+          setHistoryError(null);
+          try {
+            const res = await fetch(`/api/history?tenantId=${tenantId}`);
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message);
+            setHistory(data.history || []);
+          } catch (err) {
+            console.error(err);
+            setHistoryError(err.message);
+          } finally {
+            setLoadingHistory(false);
+          }
+        }
+        loadHistory();
+      }, [tenantId]);
 
-      // Derived values
-      const charges = useMemo(() => rental + water + electricity + (otherAmount || 0), [rental, water, electricity, otherAmount]);
-      const payments = useMemo(() => paymentAmount || 0, [paymentAmount]);
-      const depositInterest = useMemo(() => applyDepositInterest ? (depositBalance * (interestRate / 100)) / 12 : 0, [applyDepositInterest, interestRate, depositBalance]);
-      const newDepositBalance = useMemo(() => depositBalance + depositInterest, [depositBalance, depositInterest]);
-      const amountDue = useMemo(() => openingBalance + charges - payments + adjustment, [openingBalance, charges, payments, adjustment]);
-      const closingBalance = useMemo(() => amountDue, [amountDue]);
+      // Compute total charges for the month
+      const charges = rental + water + electricity + (otherAmount || 0);
 
-      // Email
-      const subject = `${month} | Lease Statement / Invoice`;
-      const body = `Good day Tenant,\n\nAttached is your lease statement for ${month}.\n\nOpening Balance: ${money(openingBalance)}\nCharges: ${money(charges)}\nPayments: ${money(payments)}\nAdjustments: ${money(adjustment)}\nAmount Due: ${money(amountDue)}\nDeposit Balance: ${money(newDepositBalance)}`;
+      // Sum payments from history for current month
+      const paymentsThisMonth = history.reduce((sum, row) => sum + (row.payments || 0), 0);
 
-      // Simple history data for demonstration
-      const historyData = [
-        { date: '2025-07-23', open: 0, chg: 8676.76, pay: 8000, adj: 0, dep: 9300.15 },
-        { date: '2025-08-23', open: openingBalance, chg: charges, pay: payments, adj: adjustment, dep: newDepositBalance },
-      ];
+      // Calculate amount due (opening + charges - payments)
+      const openingBalance = history.length > 0 ? history[history.length - 1].closingBalance : 0;
+      const amountDue = openingBalance + charges - paymentsThisMonth;
+
+      // Handle adding a payment
+      async function handleAddPayment() {
+          // Basic validation
+          if (paymentAmount <= 0) {
+            alert('Please enter a valid payment amount.');
+            return;
+          }
+          if (!paymentDate) {
+            alert('Please select a payment date.');
+            return;
+          }
+          try {
+            const res = await fetch('/api/payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                tenantId,
+                amount: paymentAmount,
+                date: paymentDate,
+                method: paymentMethod,
+              }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || data.message);
+            // Refresh history after successful payment
+            setPaymentAmount(0);
+            setPaymentDate('');
+            // reload history
+            const histRes = await fetch(`/api/history?tenantId=${tenantId}`);
+            const histData = await histRes.json();
+            setHistory(histData.history || []);
+          } catch (err) {
+            alert(`Error recording payment: ${err.message}`);
+          }
+      }
+
+      // Handle generating a PDF statement
+      async function handleGenerateStatement() {
+        try {
+          const res = await fetch('/api/statement', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tenantId, month }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || data.message);
+          window.open(data.url, '_blank');
+        } catch (err) {
+          alert(`Error generating statement: ${err.message}`);
+        }
+      }
 
       return (
-        <div className="mx-auto max-w-6xl p-4">
-          {/* Header */}
-          <header className="bg-white border-b p-4 flex items-center gap-2">
-            <span className="material-icons text-gray-500">description</span>
-            <h1 className="text-lg font-semibold">Lease Statements</h1>
-            <div className="ml-auto">
-              <Badge>MVP</Badge>
+        <div className="space-y-6">
+          <h1 className="text-2xl font-bold text-indigo-700">Lease Statements</h1>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Charges section */}
+            <div className="p-4 bg-white rounded-lg shadow space-y-4">
+              <h2 className="font-semibold text-lg">Charges for {month}</h2>
+              <Field label="Monthly Rent" value={rental} onChange={setRental} />
+              <Field label="Water" value={water} onChange={setWater} />
+              <Field label="Electricity" value={electricity} onChange={setElectricity} />
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Other Description</label>
+                <input
+                  type="text"
+                  value={otherDesc}
+                  onChange={(e) => setOtherDesc(e.target.value)}
+                  className="w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+              </div>
+              <Field label="Other Amount" value={otherAmount} onChange={setOtherAmount} />
             </div>
-          </header>
-
-          {/* Tabs */}
-          <Tabs defaultValue="run">
-            {/* Tab headers */}
-            <TabsList className="my-4 grid grid-cols-2 md:grid-cols-4 gap-2">
-              <TabsTrigger value="run">Monthly Run</TabsTrigger>
-              <TabsTrigger value="payments">Payments</TabsTrigger>
-              <TabsTrigger value="history">History</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-            </TabsList>
-
-            {/* Monthly Run */}
-            <TabsContent value="run" className="grid md:grid-cols-2 gap-4">
-              {/* Left column: inputs */}
-              <Card>
-                <CardContent className="space-y-4">
-                  {/* Month selector & deposit interest toggle */}
-                  <div className="grid md:grid-cols-3 gap-3 items-end">
-                    <div className="space-y-2 md:col-span-2">
-                      <Label>Statement Month</Label>
-                      <Input value={month} onChange={(e) => setMonth(e.target.value)} />
-                      <p className="flex items-center gap-1 text-xs text-gray-500"><span className="material-icons text-sm">event</span> e.g. "April 2025"</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Auto-apply Deposit Interest</Label>
-                      <div className="flex items-center gap-2">
-                        <Switch checked={applyDepositInterest} onCheckedChange={setApplyDepositInterest} />
-                        <span className="text-sm text-gray-500">{interestRate.toFixed(2)}% p.a.</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Carry-over & Adjustments */}
-                  <div className="space-y-2 rounded-xl border bg-white p-3">
-                    <div className="mb-2 flex items-center justify-between">
-                      <h3 className="font-medium">Carry-over &amp; Adjustments</h3>
-                      <Badge variant="outline">Auto from last month</Badge>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Opening Balance" value={openingBalance} onChange={setOpeningBalance} />
-                      <Field label="Adjustment (+/−)" value={adjustment} onChange={setAdjustment} />
-                    </div>
-                  </div>
-
-                  {/* Charges */}
-                  <div className="space-y-3 rounded-xl border bg-white p-3">
-                    <h3 className="font-medium">Charges</h3>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <Field label="Monthly Rental" value={rental} onChange={setRental} />
-                      <Field label="Water" value={water} onChange={setWater} />
-                      <Field label="Electricity" value={electricity} onChange={setElectricity} />
-                      <Field label="Other Amount" value={otherAmount} onChange={setOtherAmount} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Other Description</Label>
-                      <Input value={otherDesc} onChange={(e) => setOtherDesc(e.target.value)} placeholder="e.g., Once-off plumber call-out" />
-                    </div>
-                  </div>
-
-                  {/* Payments quick capture */}
-                  <div className="space-y-3 rounded-xl border bg-white p-3">
-                    <h3 className="font-medium">Payments This Period</h3>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <Field label="Payment Amount" value={paymentAmount} onChange={setPaymentAmount} />
-                      <div className="space-y-2">
-                        <Label>Method</Label>
-                        <Select defaultValue="eft">
-                          <SelectItem value="eft">EFT</SelectItem>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="other">Other</SelectItem>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Totals summary */}
-                  <div className="space-y-1 rounded-xl border bg-gray-50 p-3">
-                    <div className="flex justify-between text-sm"><span>Opening Balance</span><span>{money(openingBalance)}</span></div>
-                    <div className="flex justify-between text-sm"><span>Charges</span><span>{money(charges)}</span></div>
-                    <div className="flex justify-between text-sm"><span>Payments</span><span>-{money(payments)}</span></div>
-                    <div className="flex justify-between text-sm"><span>Adjustments</span><span>{money(adjustment)}</span></div>
-                    <div className="mt-1 border-t pt-2 flex justify-between font-semibold"><span>Amount Due</span><span>{money(amountDue)}</span></div>
-                  </div>
-
-                  {/* Email preview */}
-                  <div className="space-y-2 rounded-xl border bg-white p-3">
-                    <h3 className="font-medium">Email Options</h3>
-                    <div className="space-y-2">
-                      <Label>Subject</Label>
-                      <Input value={subject} readOnly />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Body</Label>
-                      <Textarea className="min-h-[160px]" value={body} readOnly />
-                    </div>
-                    <div className="flex gap-2 pt-1">
-                      <Button><span className="material-icons mr-1 text-sm">email</span>Send Test</Button>
-                      <Button variant="secondary"><span className="material-icons mr-1 text-sm">send</span>Send</Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Right column: Live Preview (mock) */}
-              <Card>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium">Live Preview</h3>
-                    <Badge variant="outline">{month}</Badge>
-                  </div>
-                  {/* PDF Statement mock */}
-                  <div className="rounded-xl border bg-white">
-                    <div className="border-b p-3 flex items-center justify-between">
-                      <span className="text-sm font-medium">PDF Statement (mock)</span>
-                      <Badge>Single Page</Badge>
-                    </div>
-                    <div className="p-4 text-sm text-gray-500">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="flex justify-between"><span>Opening Balance</span><span>{money(openingBalance)}</span></div>
-                          <div className="flex justify-between"><span>Rental</span><span>{money(rental)}</span></div>
-                          <div className="flex justify-between"><span>Water</span><span>{money(water)}</span></div>
-                          <div className="flex justify-between"><span>Electricity</span><span>{money(electricity)}</span></div>
-                          {otherAmount ? (
-                            <div className="flex justify-between">
-                              <span>{otherDesc || 'Other'}</span><span>{money(otherAmount)}</span>
-                            </div>
-                          ) : null}
-                        </div>
-                        <div>
-                          <div className="flex justify-between"><span>Payments</span><span>-{money(payments)}</span></div>
-                          <div className="flex justify-between"><span>Adjustment</span><span>{money(adjustment)}</span></div>
-                          <div className="flex justify-between font-semibold"><span>Amount Due</span><span>{money(amountDue)}</span></div>
-                          <div className="mt-2 flex justify-between text-xs"><span>Deposit (new)</span><span>{money(newDepositBalance)}</span></div>
-                        </div>
-                      </div>
-                      <p className="mt-4 italic text-xs">* Final PDF will match your existing template (with Opening Balance &amp; Adjustment lines).</p>
-                    </div>
-                  </div>
-                  {/* Email preview echo */}
-                  <div className="rounded-xl border bg-white">
-                    <div className="border-b p-3 flex items-center justify-between">
-                      <span className="text-sm font-medium">Email Preview</span>
-                      <Badge variant="outline">{month}</Badge>
-                    </div>
-                    <div className="p-4 text-sm whitespace-pre-line">{body}</div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Payments tab */}
-            <TabsContent value="payments">
-              <Card>
-                <CardContent className="space-y-4">
-                  <h3 className="font-medium">Record Payments</h3>
-                  <div className="grid md:grid-cols-4 gap-3 items-end">
-                    <Field label="Amount" value={paymentAmount} onChange={setPaymentAmount} />
-                    <div className="space-y-2">
-                      <Label>Date</Label>
-                      <Input
-                        type="date"
-                        defaultValue={new Date().toISOString().slice(0, 10)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Method</Label>
-                      <Select defaultValue="eft">
-                        <SelectItem value="eft">EFT</SelectItem>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="snapscan">SnapScan</SelectItem>
-                      </Select>
-                    </div>
-                    <Button className="mt-6">Add Payment</Button>
-                  </div>
-                  <div className="rounded-xl border bg-gray-50 p-3 text-sm">
-                    <div className="flex justify-between"><span>Unreconciled total</span><strong>{money(paymentAmount)}</strong></div>
-                    <p className="text-xs text-gray-500">(In MVP, this feeds the Monthly Run automatically.)</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* History tab */}
-            <TabsContent value="history">
-              <Card>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="material-icons text-gray-500">history</span>
-                    <h3 className="font-medium">Statement History</h3>
-                  </div>
-                  <div className="overflow-x-auto rounded-xl border">
-                    <div className="grid grid-cols-10 gap-2 border-b bg-gray-50 px-3 py-2 text-xs font-medium">
-                      <div>Date</div>
-                      <div>Opening</div>
-                      <div>Charges</div>
-                      <div>Payments</div>
-                      <div>Adjust</div>
-                      <div>Amount Due</div>
-                      <div>Closing</div>
-                      <div>Deposit</div>
-                      <div>PDF</div>
-                      <div>Actions</div>
-                    </div>
-                    {historyData.map((row, i) => {
-                      const due = row.open + row.chg - row.pay + row.adj;
-                      const close = due;
-                      return (
-                        <div key={i} className="grid grid-cols-10 gap-2 items-center border-b px-3 py-2 text-xs">
-                          <div>{row.date}</div>
-                          <div>{money(row.open)}</div>
-                          <div>{money(row.chg)}</div>
-                          <div>-{money(row.pay)}</div>
-                          <div>{money(row.adj)}</div>
-                          <div className="font-medium">{money(due)}</div>
-                          <div>{money(close)}</div>
-                          <div>{money(row.dep)}</div>
-                          <div><Button variant="outline" size="sm"><span className="material-icons text-sm mr-1">download</span>PDF</Button></div>
-                          <div className="flex gap-2">
-                            <Button variant="secondary" size="sm">Resend</Button>
-                            <Button variant="outline" size="sm"><span className="material-icons text-sm mr-1">visibility</span>Open</Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-xs text-gray-500">Each row shows Opening → Closing linkage, ensuring carry‑over is visible across months.</p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Settings tab */}
-            <TabsContent value="settings">
-              <Card>
-                <CardContent className="space-y-4">
-                  <h3 className="font-medium">Defaults &amp; Templates</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Default Rental (ZAR)</Label>
-                      <Input
-                        type="number"
-                        value={rental}
-                        onChange={(e) => setRental(parseFloat(e.target.value || '0'))}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Deposit Interest (annual %)</Label>
-                      <Input
-                        type="number"
-                        value={interestRate}
-                        onChange={(e) => setInterestRate(parseFloat(e.target.value || '0'))}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Email Body Template (read-only mock)</Label>
-                    <Textarea readOnly className="min-h-[140px]" value={body} />
-                  </div>
-                  <div className="rounded-xl border bg-gray-50 p-3 text-sm">
-                    <p className="mb-2 font-medium">Deployment notes</p>
-                    <ul className="ml-5 list-disc space-y-1">
-                      <li>Azure Static Web App + Functions + Cosmos DB + Blob Storage + SendGrid.</li>
-                      <li>Statements table will store <code>opening_balance</code>, <code>period_charges</code>, <code>period_payments</code>, <code>adjustments</code>, <code>closing_balance</code>.</li>
-                      <li>History grid shows Opening → Closing to make carry‑over explicit.</li>
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+            {/* Payments section */}
+            <div className="p-4 bg-white rounded-lg shadow space-y-4">
+              <h2 className="font-semibold text-lg">Record a Payment</h2>
+              <Field label="Amount" value={paymentAmount} onChange={setPaymentAmount} />
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Date</label>
+                <input
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">Method</label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="w-full rounded-md border-gray-300 p-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                >
+                  <option value="EFT">EFT</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Snapscan">Snapscan</option>
+                </select>
+              </div>
+              <button
+                onClick={handleAddPayment}
+                className="bg-indigo-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow hover:bg-indigo-700"
+              >
+                Add Payment
+              </button>
+            </div>
+          </div>
+          {/* Summary and actions */}
+          <div className="p-4 bg-white rounded-lg shadow space-y-2">
+            <div className="text-md">Opening Balance: <strong>{money(openingBalance)}</strong></div>
+            <div className="text-md">Total Charges: <strong>{money(charges)}</strong></div>
+            <div className="text-md">Payments This Month: <strong>{money(paymentsThisMonth)}</strong></div>
+            <div className="text-md">Amount Due: <strong>{money(amountDue)}</strong></div>
+            <button
+              onClick={handleGenerateStatement}
+              className="mt-4 bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium shadow hover:bg-green-700"
+            >
+              Generate Statement
+            </button>
+          </div>
+          {/* History section */}
+          <div className="p-4 bg-white rounded-lg shadow">
+            <h2 className="font-semibold text-lg mb-2">History</h2>
+            {loadingHistory && <p>Loading…</p>}
+            {historyError && <p className="text-red-600">Error: {historyError}</p>}
+            {!loadingHistory && history.length === 0 && !historyError && <p>No history available.</p>}
+            {history.length > 0 && (
+              <table className="min-w-full text-left text-sm border">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="px-2 py-1 border">Month</th>
+                    <th className="px-2 py-1 border">Opening</th>
+                    <th className="px-2 py-1 border">Charges</th>
+                    <th className="px-2 py-1 border">Payments</th>
+                    <th className="px-2 py-1 border">Closing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {history.map((row, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-2 py-1 border">{row.month}</td>
+                      <td className="px-2 py-1 border">{money(row.openingBalance)}</td>
+                      <td className="px-2 py-1 border">{money(row.charges)}</td>
+                      <td className="px-2 py-1 border">{money(row.payments)}</td>
+                      <td className="px-2 py-1 border">{money(row.closingBalance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       );
     }
-    // Render the App into the root div
-    ReactDOM.render(<App />, document.getElementById('root'));
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
   </script>
-  <!-- Material Icons: used for simple icons instead of lucide-react to avoid additional dependencies -->
-  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" />
 </body>
 </html>

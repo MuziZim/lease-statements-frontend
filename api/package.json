@@ -1,11 +1,12 @@
 {
   "name": "lease-statements-api",
-  "version": "1.0.0",
-  "description": "API functions for the lease statements web app",
+  "version": "1.1.0",
+  "description": "Improved API functions for the lease statements web app",
   "main": "index.js",
   "dependencies": {
     "pdfkit": "^0.13.0",
     "@azure/storage-blob": "^12.10.0",
-    "@azure/cosmos": "^4.5.0"
+    "@azure/cosmos": "^4.5.0",
+    "uuid": "^9.0.0"
   }
 }

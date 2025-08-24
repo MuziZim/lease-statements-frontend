@@ -6,7 +6,7 @@
   "dependencies": {
     "pdfkit": "^0.13.0",
     "@azure/storage-blob": "^12.10.0",
-    "@azure/cosmos": "^4.5.0",
+    "@azure/cosmos": "^3.19.4",
     "uuid": "^9.0.0"
   }
 }
